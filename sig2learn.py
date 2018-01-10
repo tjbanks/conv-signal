@@ -15,15 +15,7 @@ class Signals(object):
         return
 
     def load_mat(self, filename, matvarname):
-        
-        mat_extension = ".mat" #To generalize later if we have different filetypes
-        if(filename.endswith(mat_extension)):
-            if not matvarname:
-                raise ValueError('matvarname variable not defined... Exiting')
-        mat = sio.loadmat(filename)
-        mdata = mat[matvarname]
-        matx = np.array(mdata).ravel()
-
+        matx = load_mat(filename, matvarname)
         return MultiSignal(SingleSignal(matx))
 
 ##Intermediary
@@ -97,6 +89,11 @@ class MultiSignal(object):
         self.signals[-1].replace_np_arr(npa)
         return self
 
+    def load_mat(self, filename, matvarname):
+        matx = load_mat(filename, matvarname)
+        self.append_signal(SingleSignal(matx))
+        return self
+        
     def append_bandpass(self, low, high, order=2, index=0):
         s = SingleSignal(self.signals[index].get_bandpass_filter(low, high, order))
         s.set_name('%s Filter Band %d - %d Hz'%(self.signals[index].get_name(), low, high))
@@ -146,15 +143,26 @@ class NP_MultiSignal(object):
         self.np_arr = scaler.fit_transform(self.np_arr)
         return self
 
-    def to_supervised_series(self, look_back, future_element):
+    def to_supervised_series(self, look_back, future_element, stride=1):
         """Returns all indexes as time series, last element of each line is the desired output
         The desired output is given as +future_element of the last row"""
         out = series_to_supervised_Data(self.np_arr, n_in=look_back, n_out=future_element, dropnan=True)
-        out = out.values
+        out = out.values[::stride,:]
         return out
 
     
 #================ AUX FUNCTIONS ================
+
+def load_mat(filename, matvarname):
+    mat_extension = ".mat" #To generalize later if we have different filetypes
+    if(filename.endswith(mat_extension)):
+        if not matvarname:
+            raise ValueError('matvarname variable not defined... Exiting')
+    mat = sio.loadmat(filename)
+    mdata = mat[matvarname]
+    matx = np.array(mdata).ravel()
+    return matx
+
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
     low = lowcut / nyq
@@ -204,3 +212,12 @@ def series_to_supervised_Data(data, n_in=1, n_out=1, dropnan=True):
 
     return reframed
 
+
+def supervised_series_to4D(data, channels, features):
+    # reshape input to be [channels, time steps, features]
+    temp = []   
+    def myfunc(x):
+        temp.append(np.reshape(x, (channels, features, 1)))
+    np.apply_along_axis(myfunc, axis=1, arr=data )
+    ret = np.array(temp);
+    return ret
