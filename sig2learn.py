@@ -123,7 +123,7 @@ class MultiSignal(object):
         self.signals[-1].replace_np_arr(npa)
         return self
 
-    def to_np_signal(self):
+    def to_np_signals(self):
         bandsets = []
         for s in self.signals:
             bandsets.append(s.get_np_arr())
@@ -137,7 +137,7 @@ class NP_MultiSignal(object):
         self.np_arr = npa
         return
     
-    def to_np(self):
+    def get_np(self):
         return self.np_arr
     
     def scale(self, scaler):
@@ -146,16 +146,13 @@ class NP_MultiSignal(object):
         self.np_arr = scaler.fit_transform(self.np_arr)
         return self
 
-    def to_supervised_series_2D(self):
-        """Returns the selected index time series, last element will be goal"""
-        return
-
-    def to_supervised_series_3D(self, look_back, future_element):
-        """Returns all indexes as time series"""
-        out = series_to_supervised_CNNData(self.np_arr, n_in=look_back, n_out=future_element, dropnan=True)
+    def to_supervised_series(self, look_back, future_element):
+        """Returns all indexes as time series, last element of each line is the desired output
+        The desired output is given as +future_element of the last row"""
+        out = series_to_supervised_Data(self.np_arr, n_in=look_back, n_out=future_element, dropnan=True)
         out = out.values
         return out
-    
+
     
 #================ AUX FUNCTIONS ================
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -171,21 +168,7 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
     y = lfilter(b, a, data)
     return y
 
-
-def hilbert_transform(signal):
-    return
-
-
-def create_dataset(dataset, look_back=1):
-    dataX, dataY = [], []
-    for i in range(len(dataset)-look_back-1):
-        a = dataset[i:(i+look_back), 0]
-        dataX.append(a)
-        dataY.append(dataset[i + look_back, 0])
-    return np.array(dataX), np.array(dataY)
-
-    
-    # convert series to supervised learning
+# convert series to supervised learning
 def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
     n_vars = 1 if type(data) is list else data.shape[1]
     df = DataFrame(data)
@@ -209,20 +192,8 @@ def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
         agg.dropna(inplace=True)
         
     return agg
- 
-    
-def series_to_supervised_DNNData(data, n_in=1, n_out=1, dropnan=True):
-    
-    reframed = series_to_supervised(data, n_in, n_out)
-    (ndata, nlen) = data.shape
-    
-    startx = n_in*nlen
-    endx = (startx-1) + (nlen*n_out)
-    reframed.drop(reframed.columns[range(startx, endx)], axis=1, inplace=True)
 
-    return reframed
-
-def series_to_supervised_CNNData(data, n_in=1, n_out=1, dropnan=True):
+def series_to_supervised_Data(data, n_in=1, n_out=1, dropnan=True):
     
     reframed = series_to_supervised(data, n_in, n_out)
     (ndata, nlen) = data.shape

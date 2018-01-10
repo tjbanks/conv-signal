@@ -20,9 +20,25 @@ s = Signals().load_mat(matfile,matvar).set_name('LFP1').cut(1000,4000) \
     
 scaler = MinMaxScaler(feature_range=(0,1))
     
-nps = s.to_np_signal().scale(scaler).to_supervised_series_3D(300, 20)
+nps = s.to_np_signals().scale(scaler).to_supervised_series(300, 20)
+print s.to_np_signals().get_np().shape
+print nps.shape
+train = nps[:3000, :]
+test = nps[3000:, :]
+# split into input and outputs
+trainX, trainY = train[:, :-1], train[:, -1]
+testX, testY =    test[:, :-1],  test[:, -1]
+#print(trainX.shape, trainY.shape, testX.shape, testY.shape)
+    
+# reshape input to be [channels, time steps, features]
+temp = []   
+def myfunc(x):
+    temp.append(np.reshape(x, (7, 300, 1)))
+np.apply_along_axis(myfunc, axis=1, arr=trainX )
+trainX = np.array(temp);
 
-print nps
+print trainX.shape
+sys.exit('ya')
 
 print len(s.get_signals())
 
