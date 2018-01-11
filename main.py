@@ -11,15 +11,7 @@ matvar = "LFP_array_all_sum_afterHP"
 look_back = 300
 future_element = 20
 
-s = Signals().load_mat(matfile,matvar).set_name('LFP1').cut(1000,21000) \
-    .append_bandpass(2,10).to_hilbert() \
-    .append_bandpass(11,20).to_hilbert() \
-    .append_bandpass(21,30).to_hilbert() \
-    .append_bandpass(31,40).to_hilbert() \
-    .append_bandpass(41,50).to_hilbert() \
-    .append_bandpass(51,63).to_hilbert() \
-    .append_bandpass(64,84).to_hilbert() \
-    .remove_original_signal()
+s = Signals().load_mat(matfile,matvar).set_name('LFP1').cut(1000,21000)
     
 scaler = MinMaxScaler(feature_range=(0,1))
     
@@ -54,5 +46,5 @@ def plot_signal(x, n_per_second, signame, newPlot=True):
 
 plt.figure(figsize=(15,10))
 for sig in s.get_signals():
-    plot_signal(sig.get_np_arr(), 1000, sig.get_name(), newPlot=False)
+    plot_signal(sig.get_np_arr(), 1000, sig.get_name(), newPlot=False)#len of signal / fs
 #plot_signal(s.get_signals()[1].get_np_arr(), 1000, s.get_signals()[1].get_name())

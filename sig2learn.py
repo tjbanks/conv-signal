@@ -4,9 +4,13 @@ __version__ = "1.0.0"
 
 from scipy.signal import butter, lfilter, hilbert
 import scipy.io as sio
+from scipy.io.wavfile import write as wavwrite
+from scipy.fftpack import fft
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
+import matplotlib.pyplot as plt
+import wave
 
 ##Input
 class Signals(object):
@@ -17,6 +21,13 @@ class Signals(object):
     def load_mat(self, filename, matvarname):
         matx = load_mat(filename, matvarname)
         return MultiSignal(SingleSignal(matx))
+    
+    def load_wav16(self, filename, channel=0):
+        (wavx,nps) = load_wav16(filename, channel)
+        ms = MultiSignal(SingleSignal(wavx))
+        ms.set_n_per_second(nps)
+        return ms
+                
 
 ##Intermediary
 class SingleSignal(object):
@@ -26,6 +37,7 @@ class SingleSignal(object):
     def __init__(self, numpy_arr):
         self.np_arr = numpy_arr
         self.readable_name = ''
+        self.n_per_second = 1000
         return 
 
     def testprint(self):
@@ -37,15 +49,48 @@ class SingleSignal(object):
     def get_name(self):
         return self.readable_name
     
+    def get_n_per_second(self):
+        return self.n_per_second
+    
     def replace_np_arr(self, npa):
         self.np_arr = npa
         return
     
     def set_name(self, name):
         self.readable_name = name
+        return
+        
+    def set_n_per_second(self, n_per):
+        self.n_per_second = n_per
+        return
 
     def get_cutout(self,n_start,n_end):
         return self.np_arr[n_start:n_end]
+    
+    def get_cutout_seconds(self,s_start,s_end):
+        n_start = s_start*self.n_per_second
+        n_end = s_end*self.n_per_second
+        return self.np_arr[n_start:n_end]
+    
+    def plot_fft(self, newPlot=True):
+        """WORK IN PROGRES TODO"""
+        fourier_t = fft(self.get_np_arr())
+        #plot_signal(fourier_t, self.get_n_per_second(), self.get_name()+' FFT', newPlot=newPlot)
+        plt.figure(figsize=(15,10))
+        plt.clf()
+        xf = np.linspace(0.0, 1.0/(2.0*self.n_per_second), self.np_arr.size//2)
+        plt.plot(xf, 2.0/self.np_arr.size * np.abs(fourier_t[0:self.np_arr.size//2]))
+        plt.grid()
+        plt.show()
+        return
+    
+    def plot(self, newPlot=False):
+        plot_signal(self.np_arr, self.n_per_second, self.readable_name, newPlot=newPlot)
+        return
+    
+    def write_to_wav16_file(self, filename, scale=True):
+        write_to_wav16_file(filename, self.n_per_second, self.np_arr, scale=scale)
+        return
 
     def get_bandpass_filter(self, low, high, ord=2):
         return butter_bandpass_filter(self.np_arr, low, high, self.np_arr.size, order=ord)
@@ -84,11 +129,20 @@ class MultiSignal(object):
         self.signals[-1].set_name(name)
         return self
     
+    def set_n_per_second(self, n):
+        self.signals[-1].set_n_per_second(n)
+        return self
+    
     def cut(self,n_start,n_end):
         npa = self.signals[-1].get_cutout(n_start,n_end)
         self.signals[-1].replace_np_arr(npa)
         return self
-
+    
+    def cut_seconds(self,s_start, s_end):
+        npa = self.signals[-1].get_cutout_seconds(s_start,s_end)
+        self.signals[-1].replace_np_arr(npa)
+        return self
+    
     def load_mat(self, filename, matvarname):
         matx = load_mat(filename, matvarname)
         self.append_signal(SingleSignal(matx))
@@ -97,6 +151,7 @@ class MultiSignal(object):
     def append_bandpass(self, low, high, order=2, index=0):
         s = SingleSignal(self.signals[index].get_bandpass_filter(low, high, order))
         s.set_name('%s Filter Band %d - %d Hz'%(self.signals[index].get_name(), low, high))
+        s.set_n_per_second(self.signals[index].get_n_per_second())
         self.append_signal(s)
         return self
 
@@ -118,6 +173,21 @@ class MultiSignal(object):
         npa = self.signals[-1].get_hilbert_transform()
         s.set_name('%s Hilbert Transform'%(s.get_name()))
         self.signals[-1].replace_np_arr(npa)
+        return self
+    
+    def plot_fft(self, newPlot=True):
+        s = self.signals[-1]
+        s.plot_fft(newPlot)
+        return self
+    
+    def plot(self, newPlot=False):
+        s = self.signals[-1]
+        s.plot(newPlot=newPlot)
+        return self
+    
+    def write_to_wav16_file(self, filename, scale=True):
+        s = self.signals[-1]
+        s.write_to_wav16_file(filename, scale=scale)
         return self
 
     def to_np_signals(self):
@@ -162,6 +232,40 @@ def load_mat(filename, matvarname):
     mdata = mat[matvarname]
     matx = np.array(mdata).ravel()
     return matx
+
+def load_wav16(filename, ch=0):
+    wav_file = wave.open(filename,'r')
+    #Extract Raw Audio from Wav File
+    signal = wav_file.readframes(-1)
+    signal = np.fromstring(signal, 'Int16')
+    
+    #Split the data into channels 
+    channels = [[] for channel in range(wav_file.getnchannels())]
+    for index, datum in enumerate(signal):
+        channels[index%len(channels)].append(datum)
+    
+    #Get time from indices
+    #fs = wav_file.getframerate()
+    #Time=np.linspace(0, len(signal)/len(channels)/fs, num=len(signal)/len(channels))
+    return np.array(channels[ch]), wav_file.getframerate()
+
+def write_to_wav16_file(filename, rate, data, scale=True):
+    if scale:
+        data = np.int16(data/np.max(np.abs(data)) * 32767)
+    wavwrite(filename, rate, data)
+    return
+
+def plot_signal(x, n_per_second, signame, newPlot=False):
+    
+    if newPlot:
+        plt.figure(figsize=(15,10))
+        plt.clf()
+        
+    fs = x.size
+    t = np.linspace(0, float(fs)/n_per_second, fs, endpoint=False)
+    plt.plot(t, x, label=signame)
+    plt.legend()
+    plt.xlabel('Time (seconds)')
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
