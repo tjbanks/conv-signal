@@ -27,7 +27,10 @@ class Signals(object):
         ms = MultiSignal(SingleSignal(wavx))
         ms.set_n_per_second(nps)
         return ms
-                
+
+    def load_csv(self,filename):
+        csvx = load_csv(filename)
+        return MultiSignal(SingleSignal(csvx))              
 
 ##Intermediary
 class SingleSignal(object):
@@ -41,7 +44,7 @@ class SingleSignal(object):
         return 
 
     def testprint(self):
-        print self.np_arr
+        print(self.np_arr)
 
     def get_np_arr(self):
         return self.np_arr
@@ -248,6 +251,10 @@ def load_wav16(filename, ch=0):
     #fs = wav_file.getframerate()
     #Time=np.linspace(0, len(signal)/len(channels)/fs, num=len(signal)/len(channels))
     return np.array(channels[ch]), wav_file.getframerate()
+
+def load_csv(filename):
+    f = np.genfromtxt(filename,delimiter='\n')
+    return f
 
 def write_to_wav16_file(filename, rate, data, scale=True):
     if scale:
